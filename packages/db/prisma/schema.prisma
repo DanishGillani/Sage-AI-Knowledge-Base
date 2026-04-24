@@ -1,0 +1,115 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Knowledge Base ───────────────────────────────────────────────────────────
+
+model KnowledgeBase {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  sessions    Session[]
+  documents   Document[]
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("knowledge_bases")
+}
+
+// ─── Document ─────────────────────────────────────────────────────────────────
+
+model Document {
+  id              String           @id @default(cuid())
+  knowledgeBaseId String           @map("knowledge_base_id")
+  knowledgeBase   KnowledgeBase    @relation(fields: [knowledgeBaseId], references: [id], onDelete: Cascade)
+  filename        String
+  fileType        FileType         @map("file_type")
+  fileSizeBytes   Int              @map("file_size_bytes")
+  status          ProcessingStatus @default(PENDING)
+  pageCount       Int?             @map("page_count")
+  errorMessage    String?          @map("error_message")
+  createdAt       DateTime         @default(now()) @map("created_at")
+
+  @@index([knowledgeBaseId])
+  @@index([knowledgeBaseId, status])
+  @@map("documents")
+}
+
+// ─── Session ──────────────────────────────────────────────────────────────────
+
+model Session {
+  id              String         @id @default(cuid())
+  title           String         @default("New Session")
+  mode            ResponseMode   @default(PROFESSIONAL)
+  knowledgeBaseId String?        @map("knowledge_base_id")
+  knowledgeBase   KnowledgeBase? @relation(fields: [knowledgeBaseId], references: [id], onDelete: SetNull)
+  messages        Message[]
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  @@map("sessions")
+}
+
+// ─── Message ──────────────────────────────────────────────────────────────────
+
+model Message {
+  id        String      @id @default(cuid())
+  sessionId String      @map("session_id")
+  session   Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role      MessageRole
+  content   String
+  // Stored as JSON array of Source objects — see @sage/types SourceSchema
+  sources   Json        @default("[]")
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
+  @@map("messages")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum FileType {
+  PDF
+  DOC
+  DOCX
+  TXT
+  MD
+  XLSX
+  XLS
+  CSV
+  JPG
+  JPEG
+  PNG
+  GIF
+  WEBP
+  MP4
+  MOV
+  AVI
+  MKV
+}
+
+enum ProcessingStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum ResponseMode {
+  PROFESSIONAL
+  ACADEMIC
+  CASUAL
+  TECHNICAL
+  SIMPLIFIED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}

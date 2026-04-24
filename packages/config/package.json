@@ -1,0 +1,11 @@
+{
+  "name": "@sage/config",
+  "version": "0.0.1",
+  "private": true,
+  "exports": {
+    "./tsconfig/*.json": "./tsconfig/*.json",
+    "./tsconfig/*": "./tsconfig/*.json",
+    "./eslint/*": "./eslint/*.js",
+    "./tailwind": "./tailwind/preset.ts"
+  }
+}
