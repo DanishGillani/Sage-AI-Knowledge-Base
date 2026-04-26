@@ -1,0 +1,11 @@
+{
+  // Python: point at the apps/api virtual environment
+  "python.defaultInterpreterPath": "${workspaceFolder}/apps/api/.venv/bin/python",
+  // Pylance / Pyright
+  "python.languageServer": "Pylance",
+
+  // TypeScript: use workspace version
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
+  "python-envs.defaultEnvManager": "ms-python.python:system"
+}

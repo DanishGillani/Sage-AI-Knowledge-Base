@@ -1,12 +1,12 @@
 import { http, HttpResponse } from 'msw'
 
-// Default happy-path handlers — override per test with server.use(...)
+// Minimal default handlers — tests override these per-case with server.use(...)
+// Keeping defaults here prevents "unhandled request" errors for background calls
 export const handlers = [
-  http.get('/api/sessions', () => {
-    return HttpResponse.json({ items: [], total: 0, page: 1, limit: 20, hasNextPage: false })
-  }),
-
-  http.get('/api/knowledge-bases', () => {
-    return HttpResponse.json({ items: [], total: 0, page: 1, limit: 20, hasNextPage: false })
-  }),
+  http.get('/api/sessions', () =>
+    HttpResponse.json({ data: { items: [], total: 0, page: 1, limit: 20, hasNextPage: false } }),
+  ),
+  http.get('/api/knowledge-bases', () =>
+    HttpResponse.json({ data: { items: [], total: 0, page: 1, limit: 20, hasNextPage: false } }),
+  ),
 ]

@@ -1,0 +1,8 @@
+{
+  "venvPath": "apps/api",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "include": ["apps/api/app", "apps/api/tests", "apps/api/alembic"],
+  "extraPaths": ["apps/api"]
+}

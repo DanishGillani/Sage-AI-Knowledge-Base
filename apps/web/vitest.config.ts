@@ -31,7 +31,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // App alias
       '@': path.resolve(__dirname, './src'),
+      // Workspace packages — resolve to source directly so Vitest doesn't need built dist/
+      '@sage/types': path.resolve(__dirname, '../../packages/types/src/index.ts'),
+      '@sage/db': path.resolve(__dirname, '../../packages/db/src/index.ts'),
     },
   },
 })

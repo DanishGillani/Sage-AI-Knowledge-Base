@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.core.exceptions import AppException
 from app.core.logger import setup_logging
-from app.routers import health
+from app.routers import health, knowledge_bases
 
 logger = structlog.get_logger()
 
@@ -70,6 +70,11 @@ def create_app() -> FastAPI:
 
     # ── Routers ────────────────────────────────────────────────────────────────
     app.include_router(health.router, prefix="/health")
+    app.include_router(
+        knowledge_bases.router,
+        prefix="/knowledge-bases",
+        tags=["knowledge-bases"],
+    )
 
     return app
 
