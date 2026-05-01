@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.core.exceptions import AppException
 from app.core.logger import setup_logging
-from app.routers import health, knowledge_bases
+from app.routers import documents, health, knowledge_bases
 
 logger = structlog.get_logger()
 
@@ -74,6 +74,11 @@ def create_app() -> FastAPI:
         knowledge_bases.router,
         prefix="/knowledge-bases",
         tags=["knowledge-bases"],
+    )
+    app.include_router(
+        documents.router,
+        prefix="/documents",
+        tags=["documents"],
     )
 
     return app
