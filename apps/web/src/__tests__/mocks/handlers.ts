@@ -6,6 +6,12 @@ export const handlers = [
   http.get('/api/sessions', () =>
     HttpResponse.json({ data: { items: [], total: 0, page: 1, limit: 20, hasNextPage: false } }),
   ),
+  http.post('/api/sessions', () => HttpResponse.json({ data: null }, { status: 201 })),
+  http.get('/api/sessions/:id', () => HttpResponse.json({ data: null }, { status: 404 })),
+  http.patch('/api/sessions/:id', () => HttpResponse.json({ data: null }, { status: 404 })),
+  http.delete('/api/sessions/:id', () => new HttpResponse(null, { status: 204 })),
+  http.get('/api/sessions/:id/messages', () => HttpResponse.json({ data: [] })),
+  http.post('/api/sessions/:id/messages', () => HttpResponse.json({ data: null }, { status: 200 })),
   http.get('/api/knowledge-bases', () =>
     HttpResponse.json({ data: { items: [], total: 0, page: 1, limit: 20, hasNextPage: false } }),
   ),

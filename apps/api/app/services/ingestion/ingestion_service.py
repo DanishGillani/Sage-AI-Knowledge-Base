@@ -69,7 +69,7 @@ class IngestionService:
                     embedding=vector,
                     page_number=chunk.page_number,
                     chunk_index=chunk.chunk_index,
-                    chunk_metadata={},
+                    chunk_metadata={"filename": filename},
                 )
                 for chunk, vector in zip(chunks, vectors, strict=True)
             ]

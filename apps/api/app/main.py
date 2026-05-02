@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.core.exceptions import AppException
 from app.core.logger import setup_logging
-from app.routers import documents, health, knowledge_bases
+from app.routers import chat, documents, health, knowledge_bases
 
 logger = structlog.get_logger()
 
@@ -79,6 +79,11 @@ def create_app() -> FastAPI:
         documents.router,
         prefix="/documents",
         tags=["documents"],
+    )
+    app.include_router(
+        chat.router,
+        prefix="/chat",
+        tags=["chat"],
     )
 
     return app
