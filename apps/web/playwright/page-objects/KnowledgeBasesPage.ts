@@ -46,6 +46,7 @@ export class KnowledgeBasesPage {
   }
 
   getKbCard(name: string): Locator {
-    return this.page.getByRole('link', { name })
+    // Scope to main to avoid matching the sidebar's KB navigation links
+    return this.page.locator('main').getByRole('link', { name })
   }
 }

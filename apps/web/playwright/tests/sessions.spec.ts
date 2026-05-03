@@ -62,7 +62,7 @@ test.describe('Chat session page', () => {
 
     await expect(page.getByText('Start the conversation')).toBeVisible()
     await expect(page.getByText(/ask anything about/i)).toBeVisible()
-    await expect(page.getByText('Product Docs')).toBeVisible()
+    await expect(page.locator('strong').getByText('Product Docs')).toBeVisible()
   })
 
   test('renders existing messages', async ({ page }) => {
@@ -104,37 +104,24 @@ test.describe('Chat session page', () => {
   })
 
   test('sends a message and shows the response', async ({ page }) => {
-    // Start with no messages, then simulate the POST returning a user + assistant pair
+    let fetchCount = 0
     await page.route(`/api/sessions/${SESSION_ID}/messages`, async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: [] }),
-        })
-      } else {
+      fetchCount++
+      if (route.request().method() === 'POST') {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ data: ASSISTANT_MSG }),
         })
+      } else {
+        // On re-fetch after POST, return the full conversation
+        const messages = fetchCount > 1 ? [USER_MSG, ASSISTANT_MSG] : []
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: messages }),
+        })
       }
-    })
-
-    // After send, the query is invalidated and re-fetched with both messages
-    let fetchCount = 0
-    await page.route(`/api/sessions/${SESSION_ID}/messages`, async (route) => {
-      fetchCount++
-      const messages = fetchCount > 1 ? [USER_MSG, ASSISTANT_MSG] : []
-      await route.fulfill({
-        status: fetchCount > 1 && route.request().method() === 'GET' ? 200 : 200,
-        contentType: 'application/json',
-        body: JSON.stringify(
-          route.request().method() === 'POST'
-            ? { data: ASSISTANT_MSG }
-            : { data: messages },
-        ),
-      })
     })
 
     const chatPage = new ChatPage(page)
@@ -142,8 +129,8 @@ test.describe('Chat session page', () => {
 
     await chatPage.sendMessage('What is Sage?')
 
-    // "Thinking…" indicator should appear
-    await expect(chatPage.thinkingIndicator).toBeVisible()
+    // After the POST resolves and messages are re-fetched, the assistant reply appears
+    await expect(chatPage.getMessageByContent(/ai-powered knowledge base/i)).toBeVisible()
   })
 
   test('shows OLLAMA_UNAVAILABLE error banner', async ({ page }) => {
@@ -176,6 +163,6 @@ test.describe('Chat session page', () => {
 
     await expect(page.getByText('Q&A about Product Docs')).toBeVisible()
     await expect(page.getByText('Professional')).toBeVisible()
-    await expect(page.getByText('Product Docs')).toBeVisible()
+    await expect(page.locator('header').getByText('Product Docs', { exact: true })).toBeVisible()
   })
 })
