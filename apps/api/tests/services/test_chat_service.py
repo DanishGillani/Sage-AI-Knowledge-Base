@@ -115,7 +115,7 @@ class TestChatService:
                 return_value=_make_llm("I don't have enough information."),
             ),
         ):
-            result = await service.chat(chat_request)
+            result = await svc.chat(chat_request)
 
         assert result.sources == []
 

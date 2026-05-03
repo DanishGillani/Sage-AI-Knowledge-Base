@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from 'next/server'
+import type { NextRequest, NextResponse } from 'next/server'
 
 import { prisma } from '@sage/db'
 import { CreateKnowledgeBaseSchema, makeInternalError, makeValidationError } from '@sage/types'

@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import 'tailwindcss-animate';
+@plugin 'tailwindcss-animate';
 
 /* Map CSS variables to Tailwind v4 theme tokens so bg-background etc. resolve */
 @theme inline {

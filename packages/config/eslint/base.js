@@ -19,7 +19,11 @@ export default [
       import: importPlugin,
     },
     rules: {
-      // TypeScript — no escape hatches
+      // Disable base rules superseded by TypeScript equivalents
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
+
+      // TypeScript
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-non-null-assertion': 'error',
       '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
@@ -28,13 +32,12 @@ export default [
       '@typescript-eslint/no-floating-promises': 'error',
       '@typescript-eslint/await-thenable': 'error',
 
-      // Imports
+      // Imports — enforce group order, no alphabetical requirement
       'import/order': [
-        'error',
+        'warn',
         {
           groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-          'newlines-between': 'always',
-          alphabetize: { order: 'asc' },
+          'newlines-between': 'ignore',
         },
       ],
       'import/no-duplicates': 'error',

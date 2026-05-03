@@ -6,26 +6,18 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable pnpm
 
-# ── Install dependencies (cached layer) ──────────────────────────────────────
-FROM base AS deps
-WORKDIR /repo
-
-# Copy only manifests first — Docker caches this layer until they change
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY apps/web/package.json ./apps/web/
-COPY packages/types/package.json ./packages/types/
-COPY packages/db/package.json ./packages/db/
-COPY packages/config/package.json ./packages/config/
-
-RUN pnpm install --frozen-lockfile
-
-# ── Build ─────────────────────────────────────────────────────────────────────
+# ── Install dependencies + build ─────────────────────────────────────────────
 FROM base AS builder
 WORKDIR /repo
 
-COPY --from=deps /repo/node_modules ./node_modules
-COPY --from=deps /repo/apps/web/node_modules ./apps/web/node_modules
+# CI=true tells pnpm it can remove node_modules without an interactive prompt
+ENV CI=true
+
+# pnpm workspaces need the full source tree present so local packages
+# (@sage/types, @sage/db, @sage/config) can be linked correctly
 COPY . .
+
+RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
 RUN pnpm --filter @sage/db exec prisma generate
