@@ -1,0 +1,116 @@
+name: sage
+
+services:
+  # ── PostgreSQL + pgvector ──────────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sage
+      POSTGRES_PASSWORD: sage
+      POSTGRES_DB: sage
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sage -d sage"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── Ollama (local LLM + embeddings) ───────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pull required models on first start
+    entrypoint: >
+      sh -c "ollama serve &
+             sleep 5 &&
+             ollama pull nomic-embed-text &&
+             ollama pull llama3.1:8b &&
+             wait"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ── FastAPI RAG service ────────────────────────────────────────────────────
+  api:
+    build:
+      context: apps/api
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://sage:sage@db:5432/sage
+      AI_PROVIDER: ollama
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_CHAT_MODEL: llama3.1:8b
+      OLLAMA_EMBED_MODEL: nomic-embed-text
+      API_INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-secret-change-in-prod}
+      CORS_ORIGINS: '["http://localhost:3000"]'
+      ENVIRONMENT: production
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Database migrations (runs once then exits) ────────────────────────────
+  migrate:
+    image: node:22-alpine
+    working_dir: /repo
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://sage:sage@db:5432/sage
+    volumes:
+      - .:/repo
+      - /repo/node_modules
+    command: >
+      sh -c "corepack enable pnpm &&
+             pnpm install --frozen-lockfile --ignore-scripts &&
+             pnpm --filter @sage/db exec prisma migrate deploy"
+    restart: "no"
+
+  # ── Next.js BFF + frontend ────────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://sage:sage@db:5432/sage
+      API_BASE_URL: http://api:8000
+      INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-secret-change-in-prod}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  ollama_data:
