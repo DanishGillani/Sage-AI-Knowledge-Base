@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main]
 
+# Opt into Node.js 24 runner for all actions (removes Node.js 20 deprecation warnings)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ── TypeScript checks (all packages in parallel via Turborepo) ─────────────
   typecheck:
@@ -14,11 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run typecheck
@@ -30,11 +32,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run lint
@@ -49,8 +49,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check apps/api
-      - run: ruff format --check apps/api
+      - name: Ruff lint
+        working-directory: apps/api
+        run: ruff check .
+      - name: Ruff format check
+        working-directory: apps/api
+        run: ruff format --check .
 
   # ── TypeScript unit tests ─────────────────────────────────────────────────
   test-ts:
@@ -59,11 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm turbo run test
@@ -71,9 +73,7 @@ jobs:
         if: always()
         with:
           name: ts-coverage
-          path: |
-            packages/types/coverage/
-            apps/web/coverage/
+          path: apps/web/coverage/
 
   # ── Python unit tests ─────────────────────────────────────────────────────
   test-python:
@@ -124,21 +124,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Install Playwright browsers
         working-directory: apps/web
         run: pnpm exec playwright install --with-deps chromium
       - name: Start infrastructure
-        run: docker compose -f infra/docker-compose.yml up -d
-      - name: Wait for services
+        run: docker compose up -d db
+      - name: Wait for database
         run: |
-          timeout 60 bash -c 'until docker compose -f infra/docker-compose.yml ps | grep -q "healthy"; do sleep 2; done'
+          timeout 60 bash -c 'until docker compose ps db | grep -q "healthy"; do sleep 2; done'
       - name: Run E2E tests (Chromium only in CI)
         working-directory: apps/web
         env:
