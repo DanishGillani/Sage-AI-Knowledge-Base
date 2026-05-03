@@ -64,6 +64,4 @@ class OllamaUnavailableException(AppException):
     status_code = 503
 
     def __init__(self) -> None:
-        super().__init__(
-            message="Ollama service is unavailable. Ensure `ollama serve` is running."
-        )
+        super().__init__(message="Ollama service is unavailable. Ensure `ollama serve` is running.")

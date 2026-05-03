@@ -168,6 +168,7 @@ class TestChatService:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _make_chunk(
     doc_id: str = "doc-001",
     filename: str = "runbook.pdf",

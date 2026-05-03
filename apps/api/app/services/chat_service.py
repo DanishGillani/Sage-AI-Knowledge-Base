@@ -52,9 +52,8 @@ class ChatService:
             context = "No relevant documents found in the knowledge base."
 
         # 4. Build LangChain message list
-        system_prompt = (
-            RESPONSE_MODE_SYSTEM_PROMPTS[request.mode]
-            + CONTEXT_BLOCK.format(context=context)
+        system_prompt = RESPONSE_MODE_SYSTEM_PROMPTS[request.mode] + CONTEXT_BLOCK.format(
+            context=context
         )
         messages: list[SystemMessage | HumanMessage | AIMessage] = [
             SystemMessage(content=system_prompt)

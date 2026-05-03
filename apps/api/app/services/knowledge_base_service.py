@@ -12,9 +12,7 @@ from app.schemas.knowledge_base import (
 logger = structlog.get_logger()
 
 
-def _to_response(
-    kb: KnowledgeBaseModel, repo: KnowledgeBaseRepository
-) -> KnowledgeBaseResponse:
+def _to_response(kb: KnowledgeBaseModel, repo: KnowledgeBaseRepository) -> KnowledgeBaseResponse:
     """Maps a SQLAlchemy model to the Pydantic response schema."""
     return KnowledgeBaseResponse(
         id=kb.id,

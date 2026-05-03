@@ -38,6 +38,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sage/db run db:generate
       - run: pnpm turbo run lint
 
   # ── Python lint (Ruff) ────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sage/db run db:generate
       - run: pnpm turbo run test
       - uses: actions/upload-artifact@v4
         if: always()
@@ -130,6 +132,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sage/db run db:generate
       - name: Install Playwright browsers
         working-directory: apps/web
         run: pnpm exec playwright install --with-deps chromium

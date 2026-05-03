@@ -8,6 +8,7 @@ from app.config import get_settings
 
 class Base(DeclarativeBase):
     """Base class for all SQLAlchemy models in the API service."""
+
     pass
 
 

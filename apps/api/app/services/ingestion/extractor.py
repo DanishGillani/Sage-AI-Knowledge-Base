@@ -18,8 +18,7 @@ class ExtractedPage:
 
 class BaseExtractor(ABC):
     @abstractmethod
-    async def extract(self, file_bytes: bytes, filename: str) -> list[ExtractedPage]:
-        ...
+    async def extract(self, file_bytes: bytes, filename: str) -> list[ExtractedPage]: ...
 
 
 class PDFExtractor(BaseExtractor):

@@ -19,9 +19,7 @@ class DocumentRepository:
         )
         return result.scalar_one_or_none()
 
-    async def find_by_knowledge_base(
-        self, knowledge_base_id: str
-    ) -> list[DocumentModel]:
+    async def find_by_knowledge_base(self, knowledge_base_id: str) -> list[DocumentModel]:
         result = await self._session.execute(
             select(DocumentModel)
             .where(DocumentModel.knowledge_base_id == knowledge_base_id)
@@ -60,13 +58,9 @@ class DocumentRepository:
     async def mark_ready(
         self, document_id: str, page_count: int | None = None
     ) -> DocumentModel | None:
-        return await self.update_status(
-            document_id, ProcessingStatus.READY, page_count=page_count
-        )
+        return await self.update_status(document_id, ProcessingStatus.READY, page_count=page_count)
 
-    async def mark_failed(
-        self, document_id: str, error_message: str
-    ) -> DocumentModel | None:
+    async def mark_failed(self, document_id: str, error_message: str) -> DocumentModel | None:
         return await self.update_status(
             document_id,
             ProcessingStatus.FAILED,

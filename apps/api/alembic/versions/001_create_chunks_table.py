@@ -60,8 +60,7 @@ def upgrade() -> None:
     # HNSW index — faster approximate nearest-neighbour search than IVFFlat
     # cosine distance matches nomic-embed-text's training objective
     op.execute(
-        "CREATE INDEX chunks_embedding_hnsw_idx "
-        "ON chunks USING hnsw (embedding vector_cosine_ops)"
+        "CREATE INDEX chunks_embedding_hnsw_idx ON chunks USING hnsw (embedding vector_cosine_ops)"
     )
 
     # Composite index for scoped similarity searches (knowledge_base_id + embedding)

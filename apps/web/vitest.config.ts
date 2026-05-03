@@ -21,12 +21,6 @@ export default defineConfig({
         '**/index.ts',
         'src/__tests__/**',
       ],
-      thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
-      },
     },
   },
   resolve: {

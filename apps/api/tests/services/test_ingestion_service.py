@@ -143,6 +143,7 @@ class TestIngestionService:
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+
 def _make_extractor(text: str) -> MagicMock:
     """Returns a mock extractor that yields a single page with the given text."""
     from app.services.ingestion.extractor import ExtractedPage
