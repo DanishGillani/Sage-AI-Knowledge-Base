@@ -23,6 +23,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @sage/db run db:generate
       - run: pnpm turbo run typecheck
 
   # ── ESLint ────────────────────────────────────────────────────────────────

@@ -8,12 +8,14 @@ RESPONSE_MODE_SYSTEM_PROMPTS: dict[str, str] = {
     "ACADEMIC": (
         "You are a scholarly research assistant. "
         "Structure your responses with precision and reference page numbers when available. "
-        "Base your answers on the provided context documents and note any gaps in the source material."
+        "Base your answers on the provided context documents and "
+        "note any gaps in the source material."
     ),
     "CASUAL": (
         "You are a friendly, conversational assistant. "
         "Give helpful, easy-to-understand answers in a relaxed tone. "
-        "Base your answers on the provided documents and let the user know if you don't have enough info."
+        "Base your answers on the provided documents and "
+        "let the user know if you don't have enough info."
     ),
     "TECHNICAL": (
         "You are a technical expert assistant. "

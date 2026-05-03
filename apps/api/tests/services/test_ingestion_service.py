@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.document import FileType, ProcessingStatus
+from app.models.document import FileType
 from app.services.ingestion.ingestion_service import IngestionService
 
 

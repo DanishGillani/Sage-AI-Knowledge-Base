@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -16,8 +16,8 @@ def _make_kb(kb_id: str = "kb-001", name: str = "Test KB") -> KnowledgeBaseModel
     kb.name = name
     kb.description = None
     kb.documents = []
-    kb.created_at = datetime(2026, 4, 24, tzinfo=timezone.utc)
-    kb.updated_at = datetime(2026, 4, 24, tzinfo=timezone.utc)
+    kb.created_at = datetime(2026, 4, 24, tzinfo=UTC)
+    kb.updated_at = datetime(2026, 4, 24, tzinfo=UTC)
     return kb
 
 
@@ -35,7 +35,9 @@ def mock_repo() -> MagicMock:
 
 
 @pytest.fixture
-def service(mock_session: AsyncMock, mock_repo: MagicMock, monkeypatch: pytest.MonkeyPatch) -> KnowledgeBaseService:
+def service(
+    mock_session: AsyncMock, mock_repo: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> KnowledgeBaseService:
     svc = KnowledgeBaseService(mock_session)
     monkeypatch.setattr(svc, "_repo", mock_repo)
     return svc

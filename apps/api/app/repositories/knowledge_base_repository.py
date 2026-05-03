@@ -2,7 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.document import DocumentModel, ProcessingStatus
+from app.models.document import ProcessingStatus
 from app.models.knowledge_base import KnowledgeBaseModel
 
 

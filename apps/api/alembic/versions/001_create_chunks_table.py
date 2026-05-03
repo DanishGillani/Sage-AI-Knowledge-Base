@@ -8,8 +8,9 @@ Alembic owns ONLY this table. knowledge_bases, documents, sessions,
 and messages are managed by Prisma migrations in packages/db.
 """
 
-import alembic.op as op
 import sqlalchemy as sa
+
+import alembic.op as op
 
 revision = "001"
 down_revision = None

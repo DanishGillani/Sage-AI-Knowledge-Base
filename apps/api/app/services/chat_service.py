@@ -71,8 +71,8 @@ class ChatService:
         chat_model = get_chat_model()
         try:
             response = await chat_model.ainvoke(messages)
-        except httpx.ConnectError:
-            raise OllamaUnavailableException()
+        except httpx.ConnectError as err:
+            raise OllamaUnavailableException() from err
 
         # 6. Build typed sources
         sources = [

@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from app.models.knowledge_base import KnowledgeBaseModel
 
 
-class FileType(str, enum.Enum):
+class FileType(enum.StrEnum):
     PDF = "PDF"
     DOC = "DOC"
     DOCX = "DOCX"
@@ -32,7 +32,7 @@ class FileType(str, enum.Enum):
     MKV = "MKV"
 
 
-class ProcessingStatus(str, enum.Enum):
+class ProcessingStatus(enum.StrEnum):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     READY = "READY"

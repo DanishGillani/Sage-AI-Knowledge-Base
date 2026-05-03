@@ -1,6 +1,5 @@
-from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
-from typing import Any
+from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI, Request
@@ -19,7 +18,11 @@ logger = structlog.get_logger()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
     setup_logging()
-    logger.info("sage_api_starting", environment=settings.environment, ai_provider=settings.ai_provider)
+    logger.info(
+        "sage_api_starting",
+        environment=settings.environment,
+        ai_provider=settings.ai_provider,
+    )
     yield
     logger.info("sage_api_stopping")
 

@@ -1,5 +1,14 @@
 import structlog
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    UploadFile,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -104,6 +113,6 @@ async def delete_document_chunks(
     doc_id: str,
     session: AsyncSession = Depends(get_db_session),
 ) -> None:
-    """Deletes all chunks for a document. Called by the BFF before Prisma deletes the Document row."""
+    """Deletes all chunks for a document (BFF calls this before Prisma deletes the Document row)."""
     deleted = await ChunkRepository(session).delete_by_document(doc_id)
     logger.info("document_chunks_deleted", doc_id=doc_id, deleted_count=deleted)
