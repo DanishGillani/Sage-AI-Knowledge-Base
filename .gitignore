@@ -16,9 +16,12 @@ out
 
 # Testing
 coverage
-playwright/report
-playwright/.cache
-test-results
+**/playwright/report
+**/playwright/.cache
+**/test-results
+
+# Next.js generated
+next-env.d.ts
 
 # Python
 __pycache__
