@@ -6,16 +6,14 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: sage
-      POSTGRES_PASSWORD: sage
-      POSTGRES_DB: sage
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-sage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sage}
+      POSTGRES_DB: ${POSTGRES_DB:-sage}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sage -d sage"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sage} -d ${POSTGRES_DB:-sage}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,8 +23,6 @@ services:
   ollama:
     image: ollama/ollama:latest
     restart: unless-stopped
-    ports:
-      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -60,7 +56,7 @@ services:
       ollama-init:
         condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgresql+asyncpg://sage:sage@db:5432/sage
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sage}:${POSTGRES_PASSWORD:-sage}@db:5432/${POSTGRES_DB:-sage}
       AI_PROVIDER: ollama
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_CHAT_MODEL: llama3.1:8b
@@ -86,7 +82,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://sage:sage@db:5432/sage
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sage}:${POSTGRES_PASSWORD:-sage}@db:5432/${POSTGRES_DB:-sage}
     restart: "no"
 
   # ── Next.js BFF + frontend ────────────────────────────────────────────────
@@ -103,7 +99,7 @@ services:
       migrate:
         condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgresql://sage:sage@db:5432/sage
+      DATABASE_URL: postgresql://${POSTGRES_USER:-sage}:${POSTGRES_PASSWORD:-sage}@db:5432/${POSTGRES_DB:-sage}
       API_BASE_URL: http://api:8000
       INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-secret-change-in-prod}
       NODE_ENV: production

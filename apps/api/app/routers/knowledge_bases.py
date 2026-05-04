@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db_session
+from app.core.security import verify_internal
 from app.schemas.knowledge_base import KnowledgeBaseListResponse, KnowledgeBaseResponse
 from app.services.knowledge_base_service import KnowledgeBaseService
 
@@ -15,7 +16,7 @@ def _get_service(session: AsyncSession = Depends(get_db_session)) -> KnowledgeBa
     return KnowledgeBaseService(session)
 
 
-@router.get("", response_model=KnowledgeBaseListResponse)
+@router.get("", response_model=KnowledgeBaseListResponse, dependencies=[Depends(verify_internal)])
 async def list_knowledge_bases(
     page: int = Query(default=1, ge=1, description="Page number (1-indexed)"),
     limit: int = Query(default=20, ge=1, le=100, description="Items per page"),
@@ -28,7 +29,11 @@ async def list_knowledge_bases(
     return await service.list_knowledge_bases(page=page, limit=limit)
 
 
-@router.get("/{knowledge_base_id}", response_model=KnowledgeBaseResponse)
+@router.get(
+    "/{knowledge_base_id}",
+    response_model=KnowledgeBaseResponse,
+    dependencies=[Depends(verify_internal)],
+)
 async def get_knowledge_base(
     knowledge_base_id: str,
     service: KnowledgeBaseService = Depends(_get_service),

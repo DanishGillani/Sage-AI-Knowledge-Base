@@ -42,7 +42,7 @@ class TestIngestDocumentRoute:
             files={"file": ("hello.txt", b"Hello world", "text/plain")},
             data={"knowledge_base_id": "kb-001", "file_type": "TXT"},
         )
-        assert response.status_code == 422  # missing required Header
+        assert response.status_code == 401
 
     async def test_rejects_wrong_internal_secret(self, client: AsyncClient) -> None:
         response = await client.post(

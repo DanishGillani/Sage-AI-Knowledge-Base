@@ -1,7 +1,10 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_WEAK_SECRETS = {"", "change-me-in-production", "dev-secret-change-in-prod"}
 
 
 class Settings(BaseSettings):
@@ -41,6 +44,15 @@ class Settings(BaseSettings):
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @model_validator(mode="after")
+    def reject_weak_secret_in_production(self) -> "Settings":
+        if self.environment == "production" and self.api_internal_secret in _WEAK_SECRETS:
+            raise ValueError(
+                "API_INTERNAL_SECRET must be set to a strong random value in production. "
+                'Generate one with: python -c "import secrets; print(secrets.token_hex(32))"'
+            )
+        return self
 
 
 @lru_cache

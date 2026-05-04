@@ -6,6 +6,8 @@ from httpx import AsyncClient
 from app.core.exceptions import NotFoundException
 from app.schemas.knowledge_base import KnowledgeBaseListResponse, KnowledgeBaseResponse
 
+_HEADERS = {"x-internal-secret": "change-me-in-production"}
+
 _STUB_KB = KnowledgeBaseResponse(
     id="kb-001",
     name="Engineering Runbooks",
@@ -33,7 +35,7 @@ class TestListKnowledgeBasesRoute:
             new_callable=AsyncMock,
             return_value=_STUB_LIST,
         ):
-            response = await client.get("/knowledge-bases")
+            response = await client.get("/knowledge-bases", headers=_HEADERS)
 
         assert response.status_code == 200
         data = response.json()
@@ -47,16 +49,20 @@ class TestListKnowledgeBasesRoute:
             new_callable=AsyncMock,
             return_value=_STUB_LIST,
         ) as mock_service:
-            await client.get("/knowledge-bases?page=2&limit=5")
+            await client.get("/knowledge-bases?page=2&limit=5", headers=_HEADERS)
 
         mock_service.assert_called_once_with(page=2, limit=5)
 
+    async def test_rejects_missing_secret(self, client: AsyncClient) -> None:
+        response = await client.get("/knowledge-bases")
+        assert response.status_code == 401
+
     async def test_rejects_invalid_page(self, client: AsyncClient) -> None:
-        response = await client.get("/knowledge-bases?page=0")
+        response = await client.get("/knowledge-bases?page=0", headers=_HEADERS)
         assert response.status_code == 422
 
     async def test_rejects_limit_over_100(self, client: AsyncClient) -> None:
-        response = await client.get("/knowledge-bases?limit=101")
+        response = await client.get("/knowledge-bases?limit=101", headers=_HEADERS)
         assert response.status_code == 422
 
 
@@ -68,10 +74,14 @@ class TestGetKnowledgeBaseRoute:
             new_callable=AsyncMock,
             return_value=_STUB_KB,
         ):
-            response = await client.get("/knowledge-bases/kb-001")
+            response = await client.get("/knowledge-bases/kb-001", headers=_HEADERS)
 
         assert response.status_code == 200
         assert response.json()["id"] == "kb-001"
+
+    async def test_returns_401_when_secret_missing(self, client: AsyncClient) -> None:
+        response = await client.get("/knowledge-bases/kb-001")
+        assert response.status_code == 401
 
     async def test_returns_404_when_not_found(self, client: AsyncClient) -> None:
         with patch(
@@ -79,7 +89,7 @@ class TestGetKnowledgeBaseRoute:
             new_callable=AsyncMock,
             side_effect=NotFoundException("KnowledgeBase", "missing-id"),
         ):
-            response = await client.get("/knowledge-bases/missing-id")
+            response = await client.get("/knowledge-bases/missing-id", headers=_HEADERS)
 
         assert response.status_code == 404
         body = response.json()

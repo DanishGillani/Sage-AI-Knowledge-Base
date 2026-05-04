@@ -48,7 +48,7 @@ class TestChatRoute:
 
     async def test_rejects_missing_secret(self, client: AsyncClient) -> None:
         response = await client.post("/chat/", json=_CHAT_PAYLOAD)
-        assert response.status_code == 422  # missing required header
+        assert response.status_code == 401
 
     async def test_rejects_wrong_secret(self, client: AsyncClient) -> None:
         response = await client.post(

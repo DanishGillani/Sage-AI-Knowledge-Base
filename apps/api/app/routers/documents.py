@@ -5,14 +5,13 @@ from fastapi import (
     Depends,
     File,
     Form,
-    Header,
     HTTPException,
     UploadFile,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.core.database import AsyncSessionFactory, get_db_session
+from app.core.security import verify_internal
 from app.models.document import FileType, ProcessingStatus
 from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.document_repository import DocumentRepository
@@ -21,12 +20,6 @@ from app.services.ingestion.ingestion_service import IngestionService
 
 logger = structlog.get_logger()
 router = APIRouter()
-
-
-async def _verify_internal(x_internal_secret: str = Header(...)) -> None:
-    """Blocks all calls that don't carry the shared BFF→API secret."""
-    if x_internal_secret != get_settings().api_internal_secret:
-        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 async def _run_ingestion(
@@ -51,7 +44,7 @@ async def _run_ingestion(
     "/{doc_id}/ingest",
     response_model=DocumentStatusResponse,
     status_code=202,
-    dependencies=[Depends(_verify_internal)],
+    dependencies=[Depends(verify_internal)],
 )
 async def ingest_document(
     doc_id: str,
@@ -86,7 +79,7 @@ async def ingest_document(
 @router.get(
     "/{doc_id}/status",
     response_model=DocumentStatusResponse,
-    dependencies=[Depends(_verify_internal)],
+    dependencies=[Depends(verify_internal)],
 )
 async def get_document_status(
     doc_id: str,
@@ -107,7 +100,7 @@ async def get_document_status(
 @router.delete(
     "/{doc_id}",
     status_code=204,
-    dependencies=[Depends(_verify_internal)],
+    dependencies=[Depends(verify_internal)],
 )
 async def delete_document_chunks(
     doc_id: str,

@@ -39,7 +39,7 @@ async def health_check() -> HealthResponse:
         services["database"] = ServiceStatus(status="ok")
     except Exception as exc:
         logger.error("health_db_failed", error=str(exc))
-        services["database"] = ServiceStatus(status="down", detail=str(exc))
+        services["database"] = ServiceStatus(status="down", detail="Database unavailable")
 
     # ── Ollama ────────────────────────────────────────────────────────────────
     if settings.ai_provider == "ollama":
