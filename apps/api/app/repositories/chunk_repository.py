@@ -1,4 +1,4 @@
-from sqlalchemy import delete, func, select, asc
+from sqlalchemy import asc, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chunk import ChunkModel

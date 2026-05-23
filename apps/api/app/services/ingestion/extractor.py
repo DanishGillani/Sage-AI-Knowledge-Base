@@ -33,7 +33,9 @@ class PDFExtractor(BaseExtractor):
                 for i, page in enumerate(pdf.pages, start=1):
                     text = page.extract_text() or ""
                     if len(text.strip()) < self._SPARSE_THRESHOLD:
-                        logger.warning("pdf_sparse_text_page_ocr_fallback", page=i, filename=filename)
+                        logger.warning(
+                            "pdf_sparse_text_page_ocr_fallback", page=i, filename=filename
+                        )
                         text = await self._ocr_page(file_bytes, i)
                     pages.append(ExtractedPage(text=text, page_number=i))
             return pages
@@ -75,7 +77,8 @@ class PDFExtractor(BaseExtractor):
             text = await asyncio.to_thread(pytesseract.image_to_string, img)
             return ExtractedPage(text=text, page_number=idx)
 
-        results = await asyncio.gather(*[_ocr_image(img, i) for i, img in enumerate(images, start=1)])
+        tasks = [_ocr_image(img, i) for i, img in enumerate(images, start=1)]
+        results = await asyncio.gather(*tasks)
         logger.info("pdf_ocr_complete", filename=filename, page_count=len(results))
         return list(results)
 

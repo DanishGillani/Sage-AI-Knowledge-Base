@@ -88,8 +88,8 @@ class TestChatStreamRoute:
             yield json.dumps({"type": "sources", "data": []})
             yield json.dumps({"type": "token", "data": "Hello"})
 
-        with patch("app.routers.chat.ChatService") as MockService:
-            MockService.return_value.stream_chat = _fake_stream
+        with patch("app.routers.chat.ChatService") as mock_service:
+            mock_service.return_value.stream_chat = _fake_stream
             response = await client.post("/chat/stream/", headers=_HEADERS, json=_CHAT_PAYLOAD)
 
         assert response.status_code == 200
@@ -100,8 +100,8 @@ class TestChatStreamRoute:
             yield json.dumps({"type": "sources", "data": []})
             yield json.dumps({"type": "token", "data": "world"})
 
-        with patch("app.routers.chat.ChatService") as MockService:
-            MockService.return_value.stream_chat = _fake_stream
+        with patch("app.routers.chat.ChatService") as mock_service:
+            mock_service.return_value.stream_chat = _fake_stream
             response = await client.post("/chat/stream/", headers=_HEADERS, json=_CHAT_PAYLOAD)
 
         assert "data:" in response.text
@@ -126,10 +126,10 @@ class TestChatStreamRoute:
 
         async def _fail_stream(request: object) -> object:
             raise OllamaUnavailableException()
-            yield  # noqa: unreachable — async generator syntax
+            yield  # noqa
 
-        with patch("app.routers.chat.ChatService") as MockService:
-            MockService.return_value.stream_chat = _fail_stream
+        with patch("app.routers.chat.ChatService") as mock_service:
+            mock_service.return_value.stream_chat = _fail_stream
             response = await client.post("/chat/stream/", headers=_HEADERS, json=_CHAT_PAYLOAD)
 
         assert response.status_code == 200

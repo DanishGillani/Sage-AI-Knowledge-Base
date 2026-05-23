@@ -241,7 +241,7 @@ class TestStreamChatService:
 
         async def _fail_astream(messages: list[object]) -> object:
             raise httpx.ConnectError("connection refused")
-            yield  # noqa: unreachable — needed for async generator syntax
+            yield  # noqa
 
         llm = MagicMock()
         llm.astream = _fail_astream
