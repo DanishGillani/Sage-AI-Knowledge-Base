@@ -10,46 +10,32 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { MessageBubble } from '@/components/chat/message-bubble'
 import { ChatInput } from '@/components/chat/chat-input'
-import { getSession, deleteSession } from '@/lib/api/sessions'
-import { listMessages, sendMessage } from '@/lib/api/messages'
+import { getSession, deleteSession, updateSession } from '@/lib/api/sessions'
+import { listMessages } from '@/lib/api/messages'
 
 export default function SessionPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const queryClient = useQueryClient()
   const bottomRef = useRef<HTMLDivElement>(null)
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
   const [errorBanner, setErrorBanner] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingContent, setStreamingContent] = useState('')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
 
   const { data: sessionResult, isLoading: sessionLoading } = useQuery({
     queryKey: ['session', id],
     queryFn: () => getSession(id),
-    staleTime: 60_000,
+    staleTime: 30_000,
   })
 
   const { data: messagesResult, isLoading: messagesLoading } = useQuery({
     queryKey: ['messages', id],
     queryFn: () => listMessages(id),
     staleTime: 0,
-  })
-
-  const sendMutation = useMutation({
-    mutationFn: (content: string) => sendMessage(id, { content }),
-    onSuccess: (result) => {
-      if (!result.success) {
-        const code = result.error.code
-        if (code === 'OLLAMA_UNAVAILABLE') {
-          setErrorBanner('AI model is unavailable. Make sure Ollama is running.')
-        } else if (code === 'NO_KNOWLEDGE_BASE') {
-          setErrorBanner('No knowledge base attached to this session.')
-        } else {
-          setErrorBanner(result.error.message)
-        }
-        return
-      }
-      setErrorBanner('')
-      void queryClient.invalidateQueries({ queryKey: ['messages', id] })
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] })
-    },
   })
 
   const deleteMutation = useMutation({
@@ -63,10 +49,94 @@ export default function SessionPage() {
   const messages = messagesResult?.success ? messagesResult.data : []
   const session = sessionResult?.success ? sessionResult.data : null
 
-  // Scroll to bottom whenever messages change or a send completes
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages.length, sendMutation.isPending])
+  }, [messages.length, isStreaming, streamingContent])
+
+  function startEditingTitle() {
+    if (!session) return
+    setTitleDraft(session.title)
+    setEditingTitle(true)
+    setTimeout(() => {
+      titleInputRef.current?.select()
+    }, 0)
+  }
+
+  async function saveTitle() {
+    const trimmed = titleDraft.trim()
+    setEditingTitle(false)
+    if (!trimmed || trimmed === session?.title) return
+    await updateSession(id, { title: trimmed })
+    void queryClient.invalidateQueries({ queryKey: ['session', id] })
+    void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+  }
+
+  async function handleSend(content: string) {
+    setIsStreaming(true)
+    setStreamingContent('')
+    setErrorBanner('')
+
+    try {
+      const response = await fetch(`/api/sessions/${id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+
+      if (!response.ok || !response.body) {
+        const err = (await response.json().catch(() => ({}))) as { message?: string }
+        setErrorBanner(err.message ?? 'Failed to send message')
+        return
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (!data) continue
+
+          try {
+            const event = JSON.parse(data) as {
+              type: string
+              data?: string
+              message?: string
+              messageId?: string
+            }
+
+            if (event.type === 'token') {
+              setStreamingContent((prev) => prev + (event.data ?? ''))
+            } else if (event.type === 'error') {
+              setErrorBanner(event.message ?? 'Failed to generate a response')
+            } else if (event.type === 'done') {
+              void queryClient.invalidateQueries({ queryKey: ['messages', id] })
+              void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+              void queryClient.invalidateQueries({ queryKey: ['session', id] })
+            }
+          } catch {
+            // skip malformed event
+          }
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        setErrorBanner('Connection interrupted. Please try again.')
+      }
+    } finally {
+      setIsStreaming(false)
+      setStreamingContent('')
+    }
+  }
 
   if (sessionLoading) {
     return (
@@ -101,7 +171,35 @@ export default function SessionPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="truncate font-semibold text-foreground">{session.title}</h1>
+
+          {editingTitle ? (
+            <input
+              ref={titleInputRef}
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => void saveTitle()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); void saveTitle() }
+                if (e.key === 'Escape') setEditingTitle(false)
+              }}
+              maxLength={100}
+              className="min-w-0 max-w-[240px] bg-transparent font-semibold text-foreground outline-none border-b border-foreground/40 focus:border-foreground"
+            />
+          ) : (
+            <button
+              onClick={startEditingTitle}
+              className="group flex items-center gap-1.5 min-w-0"
+              title="Click to rename"
+            >
+              <h1 className="truncate font-semibold text-foreground group-hover:opacity-70 transition-opacity">
+                {session.title}
+              </h1>
+              <svg className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+              </svg>
+            </button>
+          )}
+
           <Badge variant="secondary">{RESPONSE_MODE_LABELS[session.mode]}</Badge>
           {session.knowledgeBaseName && (
             <Badge variant="outline" className="hidden sm:inline-flex truncate max-w-[160px]">
@@ -150,21 +248,11 @@ export default function SessionPage() {
           <div className="flex items-center justify-center py-12">
             <Spinner className="text-muted-foreground" />
           </div>
-        ) : messages.length === 0 ? (
+        ) : messages.length === 0 && !isStreaming ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-              <svg
-                className="h-7 w-7 text-muted-foreground"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                />
+              <svg className="h-7 w-7 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
               </svg>
             </div>
             <div>
@@ -183,29 +271,41 @@ export default function SessionPage() {
             {messages.map((msg) => (
               <MessageBubble key={msg.id} message={msg} />
             ))}
-            {sendMutation.isPending && (
+
+            {/* Live streaming bubble */}
+            {isStreaming && (
               <div className="flex items-start gap-2">
-                <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5">
-                  <Spinner size="sm" className="text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Thinking…</span>
+                <div className="max-w-[80%] rounded-2xl rounded-bl-sm bg-muted px-4 py-2.5">
+                  {streamingContent ? (
+                    <p className="text-sm whitespace-pre-wrap">
+                      {streamingContent}
+                      <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-foreground/50 align-middle" />
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Spinner size="sm" className="text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">Thinking…</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+
             <div ref={bottomRef} />
           </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="shrink-0 border-t border-border px-6 py-4">
+      <div className="shrink-0 border-t border-border px-6 pb-4 pt-3">
         {!session.knowledgeBaseId && (
           <p className="mb-2 text-center text-xs text-muted-foreground">
             No knowledge base attached — responses will not reference documents.
           </p>
         )}
         <ChatInput
-          onSend={(content) => sendMutation.mutate(content)}
-          loading={sendMutation.isPending}
+          onSend={(content) => void handleSend(content)}
+          loading={isStreaming}
           placeholder={
             session.knowledgeBaseId
               ? `Ask about ${session.knowledgeBaseName ?? 'the knowledge base'}…`

@@ -19,16 +19,22 @@ interface UploadItem {
 
 interface DocumentUploaderProps {
   knowledgeBaseId: string
+  forceOcr?: boolean
+  onForceOcrChange?: (value: boolean) => void
 }
 
-export function DocumentUploader({ knowledgeBaseId }: DocumentUploaderProps) {
+export function DocumentUploader({
+  knowledgeBaseId,
+  forceOcr = false,
+  onForceOcrChange,
+}: DocumentUploaderProps) {
   const queryClient = useQueryClient()
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [queue, setQueue] = useState<UploadItem[]>([])
 
   const uploadMutation = useMutation({
-    mutationFn: ({ file }: { file: File }) => uploadDocument(knowledgeBaseId, file),
+    mutationFn: ({ file }: { file: File }) => uploadDocument(knowledgeBaseId, file, forceOcr),
   })
 
   const processQueue = useCallback(
@@ -141,6 +147,15 @@ export function DocumentUploader({ knowledgeBaseId }: DocumentUploaderProps) {
         >
           Choose files
         </Button>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground select-none">
+          <input
+            type="checkbox"
+            checked={forceOcr}
+            onChange={(e) => onForceOcrChange?.(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-border accent-primary"
+          />
+          Force OCR <span className="text-muted-foreground/70">(for locked or scanned PDFs)</span>
+        </label>
         <input
           ref={inputRef}
           type="file"

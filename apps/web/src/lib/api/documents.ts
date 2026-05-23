@@ -8,6 +8,17 @@ import type {
 } from '@sage/types'
 import { failure, success } from '@sage/types'
 
+export interface DocumentChunk {
+  chunk_index: number
+  page_number: number | null
+  content: string
+}
+
+export interface DocumentChunksData {
+  document_id: string
+  chunks: DocumentChunk[]
+}
+
 async function parseErrorResponse(response: Response): Promise<AppError> {
   try {
     const body = (await response.json()) as { code?: string; message?: string }
@@ -32,9 +43,11 @@ export async function listDocuments(
 export async function uploadDocument(
   knowledgeBaseId: string,
   file: File,
+  forceOcr = false,
 ): Promise<ApiResult<Document, ValidationError | UnsupportedFileTypeError | AppError>> {
   const formData = new FormData()
   formData.append('file', file)
+  formData.append('force_ocr', String(forceOcr))
   const response = await fetch(`/api/knowledge-bases/${knowledgeBaseId}/documents`, {
     method: 'POST',
     body: formData,
@@ -51,6 +64,18 @@ export async function getDocument(
   const response = await fetch(`/api/knowledge-bases/${knowledgeBaseId}/documents/${docId}`)
   if (!response.ok) return failure(await parseErrorResponse(response))
   const { data } = (await response.json()) as { data: Document }
+  return success(data)
+}
+
+export async function listDocumentChunks(
+  knowledgeBaseId: string,
+  docId: string,
+): Promise<ApiResult<DocumentChunksData, AppError>> {
+  const response = await fetch(
+    `/api/knowledge-bases/${knowledgeBaseId}/documents/${docId}/chunks`,
+  )
+  if (!response.ok) return failure(await parseErrorResponse(response))
+  const { data } = (await response.json()) as { data: DocumentChunksData }
   return success(data)
 }
 

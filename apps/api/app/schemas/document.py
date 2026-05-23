@@ -33,3 +33,14 @@ class DocumentProgressResponse(BaseModel):
     current_page: int | None
     total_pages: int | None
     stage: str | None  # "extracting" | "ocr" | "chunking" | "embedding"
+
+
+class ChunkPreviewItem(BaseModel):
+    chunk_index: int
+    page_number: int | None
+    content: str
+
+
+class DocumentChunksResponse(BaseModel):
+    document_id: str
+    chunks: list[ChunkPreviewItem]

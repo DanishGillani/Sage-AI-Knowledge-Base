@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -17,6 +17,8 @@ export default function KnowledgeBaseDetailPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [showNewSession, setShowNewSession] = useState(false)
+  const [forceOcr, setForceOcr] = useState(false)
+  const uploaderRef = useRef<HTMLElement>(null)
 
   const { data: result, isLoading } = useQuery({
     queryKey: ['knowledge-base', id],
@@ -126,9 +128,13 @@ export default function KnowledgeBaseDetailPage() {
         )}
 
         {/* Upload */}
-        <section>
+        <section ref={uploaderRef}>
           <h2 className="mb-3 text-sm font-medium text-foreground">Upload documents</h2>
-          <DocumentUploader knowledgeBaseId={id} />
+          <DocumentUploader
+            knowledgeBaseId={id}
+            forceOcr={forceOcr}
+            onForceOcrChange={setForceOcr}
+          />
         </section>
 
         {/* Documents */}
@@ -141,7 +147,13 @@ export default function KnowledgeBaseDetailPage() {
               </span>
             </h2>
           </div>
-          <DocumentList knowledgeBaseId={id} />
+          <DocumentList
+            knowledgeBaseId={id}
+            onForceOcr={() => {
+              setForceOcr(true)
+              uploaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            }}
+          />
         </section>
       </div>
 

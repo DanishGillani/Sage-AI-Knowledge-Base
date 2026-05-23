@@ -22,17 +22,63 @@ class BaseExtractor(ABC):
 
 
 class PDFExtractor(BaseExtractor):
+    _SPARSE_THRESHOLD = 20  # chars of real text before we consider a page image-only
+
     async def extract(self, file_bytes: bytes, filename: str) -> list[ExtractedPage]:
         import pdfplumber
 
-        pages: list[ExtractedPage] = []
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for i, page in enumerate(pdf.pages, start=1):
-                text = page.extract_text() or ""
-                if len(text.strip()) < 20:
-                    logger.warning("pdf_sparse_text_page", page=i, filename=filename)
-                pages.append(ExtractedPage(text=text, page_number=i))
-        return pages
+        try:
+            pages: list[ExtractedPage] = []
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                for i, page in enumerate(pdf.pages, start=1):
+                    text = page.extract_text() or ""
+                    if len(text.strip()) < self._SPARSE_THRESHOLD:
+                        logger.warning("pdf_sparse_text_page_ocr_fallback", page=i, filename=filename)
+                        text = await self._ocr_page(file_bytes, i)
+                    pages.append(ExtractedPage(text=text, page_number=i))
+            return pages
+        except Exception as exc:
+            # Locked/encrypted PDF — pdfplumber can't open it; fall back to full OCR
+            logger.warning("pdf_locked_ocr_fallback", filename=filename, error=str(exc))
+            return await self._ocr_all_pages(file_bytes, filename)
+
+    @staticmethod
+    async def _ocr_page(file_bytes: bytes, page_number: int) -> str:
+        import asyncio
+
+        import pytesseract
+        from pdf2image import convert_from_bytes
+
+        def _run() -> str:
+            images = convert_from_bytes(file_bytes, first_page=page_number, last_page=page_number)
+            return pytesseract.image_to_string(images[0]) if images else ""
+
+        return await asyncio.to_thread(_run)
+
+    @staticmethod
+    async def _ocr_all_pages(file_bytes: bytes, filename: str) -> list[ExtractedPage]:
+        import asyncio
+
+        import pytesseract
+        from pdf2image import convert_from_bytes
+
+        def _render() -> list[object]:
+            return convert_from_bytes(file_bytes)
+
+        try:
+            images = await asyncio.to_thread(_render)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Could not render PDF pages for OCR (file may be corrupted or password-protected): {exc}"
+            ) from exc
+
+        async def _ocr_image(img: object, idx: int) -> ExtractedPage:
+            text = await asyncio.to_thread(pytesseract.image_to_string, img)
+            return ExtractedPage(text=text, page_number=idx)
+
+        results = await asyncio.gather(*[_ocr_image(img, i) for i, img in enumerate(images, start=1)])
+        logger.info("pdf_ocr_complete", filename=filename, page_count=len(results))
+        return list(results)
 
 
 class DocxExtractor(BaseExtractor):
@@ -127,10 +173,18 @@ class VideoExtractor(BaseExtractor):
         return " ".join(seg.text.strip() for seg in segments if seg.text.strip())
 
 
-def get_extractor(file_type: str) -> BaseExtractor:
+class PDFOCRExtractor(PDFExtractor):
+    """Skips text extraction entirely and goes straight to OCR — for locked or scanned PDFs."""
+
+    async def extract(self, file_bytes: bytes, filename: str) -> list[ExtractedPage]:
+        logger.info("pdf_forced_ocr", filename=filename)
+        return await self._ocr_all_pages(file_bytes, filename)
+
+
+def get_extractor(file_type: str, force_ocr: bool = False) -> BaseExtractor:
     match file_type.upper():
         case "PDF":
-            return PDFExtractor()
+            return PDFOCRExtractor() if force_ocr else PDFExtractor()
         case "DOC" | "DOCX":
             return DocxExtractor()
         case "TXT" | "MD":

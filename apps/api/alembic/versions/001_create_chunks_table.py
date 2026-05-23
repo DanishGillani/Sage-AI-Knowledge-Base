@@ -40,9 +40,6 @@ def upgrade() -> None:
             index=True,
         ),
         sa.Column("content", sa.Text(), nullable=False),
-        # 768 dims = nomic-embed-text; 1536 dims = text-embedding-3-small
-        # Using 768 as default (Ollama). Changing embed model requires re-ingestion.
-        sa.Column("embedding", sa.String()),  # stored via pgvector raw DDL below
         sa.Column("page_number", sa.Integer(), nullable=True),
         sa.Column("chunk_index", sa.Integer(), nullable=False),
         sa.Column("metadata", sa.JSON(), nullable=False, server_default="{}"),

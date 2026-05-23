@@ -1,11 +1,13 @@
 'use client'
 
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
+import type { Session } from '@sage/types'
 import { cn } from '@/lib/utils'
-import { listSessions } from '@/lib/api/sessions'
+import { listSessions, updateSession } from '@/lib/api/sessions'
 import { listKnowledgeBases } from '@/lib/api/knowledge-bases'
 
 function NavItem({
@@ -29,6 +31,80 @@ function NavItem({
     >
       {children}
     </Link>
+  )
+}
+
+function SessionNavItem({ session, active }: { session: Session; active: boolean }) {
+  const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  function startEdit(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setDraft(session.title)
+    setEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  async function save() {
+    const trimmed = draft.trim()
+    setEditing(false)
+    if (!trimmed || trimmed === session.title) return
+    await updateSession(session.id, { title: trimmed })
+    void queryClient.invalidateQueries({ queryKey: ['sessions'] })
+    void queryClient.invalidateQueries({ queryKey: ['session', session.id] })
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center rounded-md px-3 py-2">
+        <input
+          ref={inputRef}
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => void save()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void save() }
+            if (e.key === 'Escape') setEditing(false)
+          }}
+          maxLength={100}
+          className="w-full bg-transparent text-sm text-sidebar-foreground outline-none border-b border-sidebar-foreground/40 focus:border-sidebar-foreground"
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className={cn(
+        'group flex items-center gap-1 rounded-md text-sm transition-colors',
+        active
+          ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+          : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+      )}
+    >
+      <Link
+        href={`/dashboard/sessions/${session.id}`}
+        className="flex flex-1 items-center gap-2 min-w-0 px-3 py-2"
+      >
+        <svg className="h-4 w-4 shrink-0 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+        <span className="truncate">{session.title}</span>
+      </Link>
+      <button
+        onClick={startEdit}
+        className="mr-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+        aria-label="Rename session"
+      >
+        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+        </svg>
+      </button>
+    </div>
   )
 }
 
@@ -118,26 +194,11 @@ export function Sidebar() {
           </div>
           <div className="flex flex-col gap-0.5">
             {sessions.slice(0, 7).map((s) => (
-              <NavItem
+              <SessionNavItem
                 key={s.id}
-                href={`/dashboard/sessions/${s.id}`}
+                session={s}
                 active={pathname === `/dashboard/sessions/${s.id}`}
-              >
-                <svg
-                  className="h-4 w-4 shrink-0 text-muted-foreground"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                  />
-                </svg>
-                <span className="truncate">{s.title}</span>
-              </NavItem>
+              />
             ))}
             {sessions.length === 0 && (
               <p className="px-3 py-2 text-xs text-muted-foreground">No chats yet</p>

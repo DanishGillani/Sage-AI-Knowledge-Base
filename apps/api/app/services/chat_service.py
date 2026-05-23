@@ -1,3 +1,6 @@
+import json
+from typing import AsyncGenerator
+
 import httpx
 import structlog
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -87,3 +90,71 @@ class ChatService:
 
         log.info("chat_complete", source_count=len(sources))
         return ChatResponse(content=str(response.content), sources=sources)
+
+    async def stream_chat(self, request: ChatRequest) -> AsyncGenerator[str, None]:
+        """
+        Same RAG pipeline as chat() but yields JSON-encoded SSE events:
+          {"type":"sources","data":[...]}   — emitted after retrieval
+          {"type":"token","data":"..."}     — one per LLM chunk
+        """
+        log = logger.bind(session_id=request.session_id, kb_id=request.knowledge_base_id)
+
+        log.info("chat_embedding_query")
+        embedding_model = get_embedding_model()
+        query_embedding = await embedding_model.aembed_query(request.message)
+
+        log.info("chat_vector_search")
+        settings = get_settings()
+        chunks_with_scores = await self._vector_repo.similarity_search(
+            knowledge_base_id=request.knowledge_base_id,
+            query_embedding=query_embedding,
+            top_k=settings.retrieval_top_k,
+        )
+        log.info("chat_chunks_retrieved", count=len(chunks_with_scores))
+
+        sources = [
+            {
+                "document_id": chunk.document_id,
+                "filename": chunk.chunk_metadata.get("filename", "unknown"),
+                "page_number": chunk.page_number,
+                "excerpt": chunk.content[:300],
+                "similarity_score": round(min(max(score, 0.0), 1.0), 4),
+            }
+            for chunk, score in chunks_with_scores
+        ]
+        yield json.dumps({"type": "sources", "data": sources})
+
+        context = (
+            "\n\n".join(
+                f"[Document: {c.chunk_metadata.get('filename', 'unknown')}"
+                + (f", Page {c.page_number}" if c.page_number else "")
+                + f"]\n{c.content}"
+                for c, _ in chunks_with_scores
+            )
+            if chunks_with_scores
+            else "No relevant documents found in the knowledge base."
+        )
+
+        system_prompt = RESPONSE_MODE_SYSTEM_PROMPTS[request.mode] + CONTEXT_BLOCK.format(
+            context=context
+        )
+        messages: list[SystemMessage | HumanMessage | AIMessage] = [
+            SystemMessage(content=system_prompt)
+        ]
+        for item in request.message_history:
+            if item.role == "USER":
+                messages.append(HumanMessage(content=item.content))
+            else:
+                messages.append(AIMessage(content=item.content))
+        messages.append(HumanMessage(content=request.message))
+
+        log.info("chat_llm_stream", mode=request.mode)
+        chat_model = get_chat_model()
+        try:
+            async for chunk in chat_model.astream(messages):
+                if chunk.content:
+                    yield json.dumps({"type": "token", "data": str(chunk.content)})
+        except httpx.ConnectError as err:
+            raise OllamaUnavailableException() from err
+
+        log.info("chat_stream_complete")

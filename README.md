@@ -33,9 +33,10 @@ Sage is a full-stack RAG (Retrieval-Augmented Generation) application that lets 
 └──────────────────────┘  └──────────┬───────────────────┘
                                      │
                           ┌──────────▼───────────────────┐
-                          │  Ollama  (or OpenAI)          │
+                          │  Ollama  (native, or OpenAI)  │
                           │  • nomic-embed-text           │
                           │  • llama3.1:8b                │
+                          │  runs on host, not in Docker  │
                           └──────────────────────────────┘
 ```
 
@@ -85,17 +86,37 @@ The Next.js BFF owns the relational data (Prisma → PostgreSQL) and generates T
 
 ## Quick Start (Docker)
 
-Prerequisites: [Docker Desktop](https://www.docker.com/products/docker-desktop/) ≥ 4.x
+Prerequisites:
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) ≥ 4.x
+- [Ollama](https://ollama.com) running natively on your machine (see note below)
+
+> **Why native Ollama?** Running Ollama inside Docker adds significant overhead — model inference is noticeably slower because Docker on macOS runs in a Linux VM without direct access to Apple Silicon (Metal/ANE). Running Ollama natively gives you full GPU/Metal acceleration and far better response times.
+
+### 1 — Install and start Ollama
+
+**macOS (recommended):**
+```bash
+brew install ollama
+ollama serve   # keep this running in a terminal tab
+```
+
+Or download the [Ollama desktop app](https://ollama.com/download) which starts automatically on login.
+
+**Pull the required models** (one-time, ~5 GB total):
+```bash
+ollama pull llama3.1:8b        # ~4.7 GB — chat model
+ollama pull nomic-embed-text   # ~274 MB — embedding model
+```
+
+### 2 — Start the rest of the stack
 
 ```bash
 git clone https://github.com/your-username/sage.git
 cd sage
 
-# Start the full stack (Postgres, Ollama, FastAPI, Next.js)
+# Starts Postgres, FastAPI, and Next.js — Ollama runs on your host
 docker compose up
 ```
-
-> **First run:** Ollama will pull `llama3.1:8b` (~4.7 GB) and `nomic-embed-text` (~274 MB). This takes a few minutes. Watch progress with `docker compose logs -f ollama`.
 
 Open [http://localhost:3000](http://localhost:3000) once all services are healthy.
 
@@ -107,18 +128,18 @@ Open [http://localhost:3000](http://localhost:3000) once all services are health
 
 - Node.js ≥ 22 + pnpm ≥ 9
 - Python ≥ 3.12 + [uv](https://docs.astral.sh/uv/)
-- [Ollama](https://ollama.com) (or an OpenAI API key)
+- [Ollama](https://ollama.com) running natively — `brew install ollama && ollama serve`
 - PostgreSQL 16 with the pgvector extension
 
-### 1 — Database
+### 1 — Ollama + Database
 
 ```bash
-# Start Postgres + pgvector (or use your own instance)
-docker compose -f infra/docker-compose.yml up -d
-
-# Pull required Ollama models
+# Pull required models (one-time)
 ollama pull nomic-embed-text
 ollama pull llama3.1:8b
+
+# Start Postgres + pgvector (or use your own instance)
+docker compose -f infra/docker-compose.yml up -d
 ```
 
 ### 2 — Environment
@@ -223,7 +244,7 @@ sage/
 │   └── db/                       # Prisma schema + generated client
 ├── infra/
 │   └── docker-compose.yml        # Dev infrastructure (Postgres + pgvector)
-└── docker-compose.yml            # Full stack for reviewers
+└── docker-compose.yml            # Full stack (Postgres + FastAPI + Next.js; Ollama runs natively)
 ```
 
 ---

@@ -85,11 +85,14 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       },
     })
 
+    const forceOcr = formData.get('force_ocr') === 'true'
+
     // Forward file to FastAPI for background ingestion
     const ingestForm = new FormData()
     ingestForm.append('file', new Blob([await file.arrayBuffer()], { type: file.type }), file.name)
     ingestForm.append('knowledge_base_id', id)
     ingestForm.append('file_type', fileType)
+    ingestForm.append('force_ocr', String(forceOcr))
 
     const ingestResponse = await internalFetch(`/documents/${document.id}/ingest`, {
       method: 'POST',

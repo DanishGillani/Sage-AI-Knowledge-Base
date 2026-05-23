@@ -27,6 +27,7 @@ class IngestionService:
         file_bytes: bytes,
         filename: str,
         file_type: FileType,
+        force_ocr: bool = False,
     ) -> None:
         """
         Full pipeline: extract → chunk → embed → store.
@@ -38,8 +39,8 @@ class IngestionService:
             await self._doc_repo.mark_processing(doc_id)
             await self._session.commit()
 
-            log.info("ingestion_extracting")
-            extractor = get_extractor(file_type.value)
+            log.info("ingestion_extracting", force_ocr=force_ocr)
+            extractor = get_extractor(file_type.value, force_ocr=force_ocr)
             pages = await extractor.extract(file_bytes, filename)
             page_count = max(
                 (p.page_number for p in pages if p.page_number is not None),

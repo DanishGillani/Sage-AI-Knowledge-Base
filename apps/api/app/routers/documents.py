@@ -15,7 +15,7 @@ from app.core.security import verify_internal
 from app.models.document import FileType, ProcessingStatus
 from app.repositories.chunk_repository import ChunkRepository
 from app.repositories.document_repository import DocumentRepository
-from app.schemas.document import DocumentStatusResponse
+from app.schemas.document import ChunkPreviewItem, DocumentChunksResponse, DocumentStatusResponse
 from app.services.ingestion.ingestion_service import IngestionService
 
 logger = structlog.get_logger()
@@ -28,6 +28,7 @@ async def _run_ingestion(
     file_bytes: bytes,
     filename: str,
     file_type: FileType,
+    force_ocr: bool = False,
 ) -> None:
     """Background-task wrapper — owns its own session since the request session is closed."""
     async with AsyncSessionFactory() as session:
@@ -37,6 +38,7 @@ async def _run_ingestion(
             file_bytes=file_bytes,
             filename=filename,
             file_type=file_type,
+            force_ocr=force_ocr,
         )
 
 
@@ -52,6 +54,7 @@ async def ingest_document(
     file: UploadFile = File(...),
     knowledge_base_id: str = Form(...),
     file_type: str = Form(...),
+    force_ocr: bool = Form(False),
 ) -> DocumentStatusResponse:
     """
     Accepts a file upload from the BFF and schedules ingestion as a background task.
@@ -65,6 +68,7 @@ async def ingest_document(
         file_bytes=file_bytes,
         filename=file.filename or "unknown",
         file_type=FileType(file_type),
+        force_ocr=force_ocr,
     )
     logger.info("ingestion_queued", doc_id=doc_id, filename=file.filename)
     return DocumentStatusResponse(
@@ -94,6 +98,30 @@ async def get_document_status(
         page_count=doc.page_count,
         error_message=doc.error_message,
         progress=None,
+    )
+
+
+@router.get(
+    "/{doc_id}/chunks",
+    response_model=DocumentChunksResponse,
+    dependencies=[Depends(verify_internal)],
+)
+async def get_document_chunks(
+    doc_id: str,
+    session: AsyncSession = Depends(get_db_session),
+) -> DocumentChunksResponse:
+    """Returns all extracted chunks for a document for the UI extraction preview."""
+    chunks = await ChunkRepository(session).get_by_document(doc_id)
+    return DocumentChunksResponse(
+        document_id=doc_id,
+        chunks=[
+            ChunkPreviewItem(
+                chunk_index=c.chunk_index,
+                page_number=c.page_number,
+                content=c.content,
+            )
+            for c in chunks
+        ],
     )
 
 

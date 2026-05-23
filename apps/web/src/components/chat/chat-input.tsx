@@ -46,7 +46,7 @@ export function ChatInput({
   return (
     <div
       className={cn(
-        'flex items-end gap-2 rounded-2xl border border-border bg-background px-4 py-2 shadow-sm',
+        'flex items-center gap-2 rounded-2xl border border-border bg-background px-4 py-2 shadow-sm',
         'focus-within:ring-2 focus-within:ring-ring',
       )}
     >
@@ -69,7 +69,7 @@ export function ChatInput({
         onClick={submit}
         disabled={disabled || loading}
         className={cn(
-          'mb-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors',
           'bg-primary text-primary-foreground hover:bg-primary/90',
           'disabled:pointer-events-none disabled:opacity-50',
         )}
@@ -83,7 +83,7 @@ export function ChatInput({
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+              d="M14 5l7 7m0 0l-7 7m7-7H3"
             />
           </svg>
         )}

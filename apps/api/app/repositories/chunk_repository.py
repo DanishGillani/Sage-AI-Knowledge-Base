@@ -1,4 +1,4 @@
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.chunk import ChunkModel
@@ -11,6 +11,17 @@ class ChunkRepository:
     async def insert_many(self, chunks: list[ChunkModel]) -> None:
         self._session.add_all(chunks)
         await self._session.flush()
+
+    async def get_by_document(self, document_id: str, limit: int | None = None) -> list[ChunkModel]:
+        q = (
+            select(ChunkModel)
+            .where(ChunkModel.document_id == document_id)
+            .order_by(asc(ChunkModel.chunk_index))
+        )
+        if limit is not None:
+            q = q.limit(limit)
+        result = await self._session.execute(q)
+        return list(result.scalars().all())
 
     async def delete_by_document(self, document_id: str) -> int:
         result = await self._session.execute(
