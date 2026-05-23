@@ -37,6 +37,11 @@ export default [
         'warn',
         {
           groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+          pathGroups: [
+            { pattern: '@/**', group: 'internal', position: 'before' },
+            { pattern: '@sage/**', group: 'external', position: 'after' },
+          ],
+          pathGroupsExcludedImportTypes: ['builtin'],
           'newlines-between': 'ignore',
         },
       ],

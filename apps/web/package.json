@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
@@ -15,6 +15,7 @@
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.10.0",
     "@sage/db": "workspace:*",
     "@sage/types": "workspace:*",
     "@tanstack/react-query": "^5.67.2",
@@ -27,7 +28,6 @@
     "react-dom": "^19.0.0",
     "react-dropzone": "^14.3.5",
     "react-hook-form": "^7.54.2",
-    "@hookform/resolvers": "^3.10.0",
     "react-markdown": "^9.0.3",
     "rehype-highlight": "^7.0.2",
     "remark-gfm": "^4.0.1",
@@ -36,8 +36,9 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
-    "@sage/config": "workspace:*",
+    "@next/eslint-plugin-next": "^16.2.6",
     "@playwright/test": "^1.50.1",
+    "@sage/config": "workspace:*",
     "@tailwindcss/postcss": "^4.0.8",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",

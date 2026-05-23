@@ -104,18 +104,24 @@ test.describe('Chat session page', () => {
   })
 
   test('sends a message and shows the response', async ({ page }) => {
-    let fetchCount = 0
+    let getCount = 0
     await page.route(`/api/sessions/${SESSION_ID}/messages`, async (route) => {
-      fetchCount++
       if (route.request().method() === 'POST') {
+        // Simulate the SSE stream the page actually reads
+        const sseBody = [
+          `data: ${JSON.stringify({ type: 'sources', data: [] })}\n\n`,
+          `data: ${JSON.stringify({ type: 'token', data: 'Sage is an AI-powered knowledge base' })}\n\n`,
+          `data: ${JSON.stringify({ type: 'done', messageId: ASSISTANT_MSG.id })}\n\n`,
+        ].join('')
         await route.fulfill({
           status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ data: ASSISTANT_MSG }),
+          contentType: 'text/event-stream; charset=utf-8',
+          body: sseBody,
         })
       } else {
-        // On re-fetch after POST, return the full conversation
-        const messages = fetchCount > 1 ? [USER_MSG, ASSISTANT_MSG] : []
+        // First GET returns empty; subsequent GETs (after done → invalidate) return full convo
+        getCount++
+        const messages = getCount > 1 ? [USER_MSG, ASSISTANT_MSG] : []
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -129,8 +135,8 @@ test.describe('Chat session page', () => {
 
     await chatPage.sendMessage('What is Sage?')
 
-    // After the POST resolves and messages are re-fetched, the assistant reply appears
-    await expect(chatPage.getMessageByContent(/ai-powered knowledge base/i)).toBeVisible()
+    // After the SSE done event the page invalidates queries; re-fetch returns the assistant msg
+    await expect(chatPage.getMessageByContent(/ai-powered knowledge base/i)).toBeVisible({ timeout: 10_000 })
   })
 
   test('shows OLLAMA_UNAVAILABLE error banner', async ({ page }) => {
@@ -138,10 +144,12 @@ test.describe('Chat session page', () => {
       if (route.request().method() === 'GET') {
         await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: [] }) })
       } else {
+        // Simulate the SSE error event that the page reads from the stream
+        const sseBody = `data: ${JSON.stringify({ type: 'error', message: 'AI model is unavailable. Make sure Ollama is running.' })}\n\n`
         await route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({ code: 'OLLAMA_UNAVAILABLE', message: 'Ollama is not running' }),
+          status: 200,
+          contentType: 'text/event-stream; charset=utf-8',
+          body: sseBody,
         })
       }
     })
@@ -150,7 +158,7 @@ test.describe('Chat session page', () => {
     await chatPage.goto(SESSION_ID)
     await chatPage.sendMessage('What is Sage?')
 
-    await expect(page.getByText(/AI model is unavailable/i)).toBeVisible()
+    await expect(page.getByText(/AI model is unavailable/i)).toBeVisible({ timeout: 10_000 })
   })
 
   test('header shows session title, mode badge, and KB name', async ({ page }) => {

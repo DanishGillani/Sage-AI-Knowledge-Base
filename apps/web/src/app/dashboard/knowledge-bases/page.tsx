@@ -3,11 +3,11 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
+import type { KnowledgeBase } from '@sage/types'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { KbCard } from '@/components/knowledge-base/kb-card'
 import { CreateKbDialog } from '@/components/knowledge-base/create-kb-dialog'
-import type { KnowledgeBase } from '@sage/types'
 import { listKnowledgeBases } from '@/lib/api/knowledge-bases'
 
 export default function KnowledgeBasesPage() {
