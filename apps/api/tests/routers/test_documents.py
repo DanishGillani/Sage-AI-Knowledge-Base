@@ -93,6 +93,46 @@ class TestDeleteDocumentChunksRoute:
         assert response.status_code == 204
 
 
+@pytest.mark.asyncio
+class TestGetDocumentChunksRoute:
+    async def test_returns_chunks_for_document(self, client: AsyncClient) -> None:
+        from app.models.chunk import ChunkModel
+
+        chunk = ChunkModel()
+        chunk.chunk_index = 0
+        chunk.page_number = 1
+        chunk.content = "Sample extracted text from the document."
+
+        with patch(
+            "app.routers.documents.ChunkRepository.get_by_document",
+            new_callable=AsyncMock,
+            return_value=[chunk],
+        ):
+            response = await client.get("/documents/doc-001/chunks", headers=_HEADERS)
+
+        assert response.status_code == 200
+        body = response.json()
+        assert body["document_id"] == "doc-001"
+        assert len(body["chunks"]) == 1
+        assert body["chunks"][0]["content"] == "Sample extracted text from the document."
+        assert body["chunks"][0]["page_number"] == 1
+
+    async def test_returns_empty_chunks_when_none_exist(self, client: AsyncClient) -> None:
+        with patch(
+            "app.routers.documents.ChunkRepository.get_by_document",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            response = await client.get("/documents/doc-999/chunks", headers=_HEADERS)
+
+        assert response.status_code == 200
+        assert response.json()["chunks"] == []
+
+    async def test_rejects_missing_secret(self, client: AsyncClient) -> None:
+        response = await client.get("/documents/doc-001/chunks")
+        assert response.status_code == 401
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 

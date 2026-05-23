@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -78,3 +79,58 @@ class TestChatRoute:
             json={**_CHAT_PAYLOAD, "message": "x" * 10_001},
         )
         assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+class TestChatStreamRoute:
+    async def test_returns_200_with_sse_content_type(self, client: AsyncClient) -> None:
+        async def _fake_stream(request: object) -> object:
+            yield json.dumps({"type": "sources", "data": []})
+            yield json.dumps({"type": "token", "data": "Hello"})
+
+        with patch("app.routers.chat.ChatService") as MockService:
+            MockService.return_value.stream_chat = _fake_stream
+            response = await client.post("/chat/stream/", headers=_HEADERS, json=_CHAT_PAYLOAD)
+
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
+
+    async def test_stream_body_contains_sse_events(self, client: AsyncClient) -> None:
+        async def _fake_stream(request: object) -> object:
+            yield json.dumps({"type": "sources", "data": []})
+            yield json.dumps({"type": "token", "data": "world"})
+
+        with patch("app.routers.chat.ChatService") as MockService:
+            MockService.return_value.stream_chat = _fake_stream
+            response = await client.post("/chat/stream/", headers=_HEADERS, json=_CHAT_PAYLOAD)
+
+        assert "data:" in response.text
+        assert '"type"' in response.text
+
+    async def test_stream_rejects_missing_secret(self, client: AsyncClient) -> None:
+        response = await client.post("/chat/stream/", json=_CHAT_PAYLOAD)
+        assert response.status_code == 401
+
+    async def test_stream_rejects_wrong_secret(self, client: AsyncClient) -> None:
+        response = await client.post(
+            "/chat/stream/",
+            headers={"x-internal-secret": "bad"},
+            json=_CHAT_PAYLOAD,
+        )
+        assert response.status_code == 401
+
+    async def test_stream_emits_error_event_when_ollama_unavailable(
+        self, client: AsyncClient
+    ) -> None:
+        from app.core.exceptions import OllamaUnavailableException
+
+        async def _fail_stream(request: object) -> object:
+            raise OllamaUnavailableException()
+            yield  # noqa: unreachable — async generator syntax
+
+        with patch("app.routers.chat.ChatService") as MockService:
+            MockService.return_value.stream_chat = _fail_stream
+            response = await client.post("/chat/stream/", headers=_HEADERS, json=_CHAT_PAYLOAD)
+
+        assert response.status_code == 200
+        assert '"type": "error"' in response.text or '"type":"error"' in response.text

@@ -68,9 +68,8 @@ class PDFExtractor(BaseExtractor):
         try:
             images = await asyncio.to_thread(_render)
         except Exception as exc:
-            raise RuntimeError(
-                f"Could not render PDF pages for OCR (file may be corrupted or password-protected): {exc}"
-            ) from exc
+            msg = f"Could not render PDF pages for OCR (corrupted or password-protected): {exc}"
+            raise RuntimeError(msg) from exc
 
         async def _ocr_image(img: object, idx: int) -> ExtractedPage:
             text = await asyncio.to_thread(pytesseract.image_to_string, img)

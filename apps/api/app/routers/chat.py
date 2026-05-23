@@ -40,10 +40,12 @@ async def chat_stream(
             async for event in ChatService(session).stream_chat(request):
                 yield f"data: {event}\n\n"
         except OllamaUnavailableException:
-            yield f"data: {json.dumps({'type': 'error', 'message': 'AI model is unavailable. Make sure Ollama is running.'})}\n\n"
+            msg = "AI model is unavailable. Make sure Ollama is running."
+            yield f"data: {json.dumps({'type': 'error', 'message': msg})}\n\n"
         except Exception as exc:
             logger.error("chat_stream_error", error=str(exc))
-            yield f"data: {json.dumps({'type': 'error', 'message': 'Stream failed unexpectedly.'})}\n\n"
+            msg = "Stream failed unexpectedly."
+            yield f"data: {json.dumps({'type': 'error', 'message': msg})}\n\n"
 
     return StreamingResponse(
         generate(),

@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -164,6 +165,124 @@ class TestChatService:
             result = await svc.chat(chat_request)
 
         assert result.sources[0].similarity_score <= 1.0
+
+
+class TestStreamChatService:
+    async def test_yields_sources_event_then_token_events(
+        self,
+        service: ChatService,
+        chat_request: ChatRequest,
+    ) -> None:
+        async def _fake_astream(messages: list[object]) -> object:
+            for token in ["Hello", " world"]:
+                chunk = MagicMock()
+                chunk.content = token
+                yield chunk
+
+        llm = MagicMock()
+        llm.astream = _fake_astream
+
+        with (
+            patch(
+                "app.services.chat_service.get_embedding_model",
+                return_value=_make_embedder([0.1] * 768),
+            ),
+            patch("app.services.chat_service.get_chat_model", return_value=llm),
+        ):
+            events = [e async for e in service.stream_chat(chat_request)]
+
+        assert len(events) >= 3
+        first = json.loads(events[0])
+        assert first["type"] == "sources"
+        assert isinstance(first["data"], list)
+
+        token_events = [json.loads(e) for e in events[1:]]
+        assert all(e["type"] == "token" for e in token_events)
+        assert "".join(e["data"] for e in token_events) == "Hello world"
+
+    async def test_stream_empty_kb_yields_empty_sources(
+        self,
+        mock_session: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+        chat_request: ChatRequest,
+    ) -> None:
+        svc = ChatService(mock_session)
+        monkeypatch.setattr(svc, "_vector_repo", _make_vector_repo([]))
+
+        async def _fake_astream(messages: list[object]) -> object:
+            chunk = MagicMock()
+            chunk.content = "No relevant info."
+            yield chunk
+
+        llm = MagicMock()
+        llm.astream = _fake_astream
+
+        with (
+            patch(
+                "app.services.chat_service.get_embedding_model",
+                return_value=_make_embedder([0.0] * 768),
+            ),
+            patch("app.services.chat_service.get_chat_model", return_value=llm),
+        ):
+            events = [e async for e in svc.stream_chat(chat_request)]
+
+        sources = json.loads(events[0])
+        assert sources["type"] == "sources"
+        assert sources["data"] == []
+
+    async def test_stream_raises_ollama_unavailable_on_connect_error(
+        self,
+        service: ChatService,
+        chat_request: ChatRequest,
+    ) -> None:
+        import httpx
+
+        from app.core.exceptions import OllamaUnavailableException
+
+        async def _fail_astream(messages: list[object]) -> object:
+            raise httpx.ConnectError("connection refused")
+            yield  # noqa: unreachable — needed for async generator syntax
+
+        llm = MagicMock()
+        llm.astream = _fail_astream
+
+        with (
+            patch(
+                "app.services.chat_service.get_embedding_model",
+                return_value=_make_embedder([0.1] * 768),
+            ),
+            patch("app.services.chat_service.get_chat_model", return_value=llm),
+            pytest.raises(OllamaUnavailableException),
+        ):
+            async for _ in service.stream_chat(chat_request):
+                pass
+
+    async def test_stream_skips_empty_content_chunks(
+        self,
+        service: ChatService,
+        chat_request: ChatRequest,
+    ) -> None:
+        async def _fake_astream(messages: list[object]) -> object:
+            for token in ["", "real", ""]:
+                chunk = MagicMock()
+                chunk.content = token
+                yield chunk
+
+        llm = MagicMock()
+        llm.astream = _fake_astream
+
+        with (
+            patch(
+                "app.services.chat_service.get_embedding_model",
+                return_value=_make_embedder([0.1] * 768),
+            ),
+            patch("app.services.chat_service.get_chat_model", return_value=llm),
+        ):
+            events = [e async for e in service.stream_chat(chat_request)]
+
+        token_events = [json.loads(e) for e in events[1:]]
+        assert len(token_events) == 1
+        assert token_events[0]["data"] == "real"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
