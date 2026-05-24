@@ -11,7 +11,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-sage}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sage} -d ${POSTGRES_DB:-sage}"]
       interval: 10s
