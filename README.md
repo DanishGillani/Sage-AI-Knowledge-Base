@@ -259,3 +259,270 @@ sage/
 | Video | MP4, MOV, AVI, MKV | faster-whisper (audio track) |
 
 Max upload size: 500 MB per file.
+
+---
+
+## Branch Strategy
+
+| Branch | Purpose |
+|---|---|
+| `develop` | Active development — push all changes here first |
+| `main` | Production — Coolify auto-deploys on every push |
+
+**Workflow:**
+1. Do all work on `develop` (or feature branches off it)
+2. Test locally
+3. Open a PR from `develop` → `main` (or merge directly)
+4. Coolify detects the push to `main` and redeploys automatically
+
+---
+
+## Server Deployment (Hetzner + Coolify)
+
+This section documents how to deploy Sage on a self-hosted VPS using [Hetzner](https://hetzner.com) and [Coolify](https://coolify.io).
+
+### Recommended server spec
+
+[Hetzner CPX32](https://www.hetzner.com/cloud) — 4 vCPU, 8 GB RAM, 160 GB disk (~€13/month). Enough headroom for Postgres, FastAPI, Next.js, and a concurrency-limited OCR pipeline while leaving cores free for Ollama inference.
+
+### 1 — Provision the server
+
+1. Create a Hetzner Cloud account, add a project, create a CPX32 (or larger) instance running **Ubuntu 24.04**.
+2. Add your SSH public key during setup.
+3. SSH in: `ssh root@<server-ip>`
+
+### 2 — Install Docker
+
+```bash
+curl -fsSL https://get.docker.com | sh
+systemctl enable --now docker
+```
+
+### 3 — Install Ollama natively (not in Docker)
+
+Running Ollama natively gives full CPU/Metal performance; Docker on Linux VMs adds overhead.
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+systemctl enable --now ollama
+```
+
+**Make Ollama listen on all interfaces** (required so Docker containers can reach it via `host.docker.internal`):
+
+```bash
+mkdir -p /etc/systemd/system/ollama.service.d
+cat > /etc/systemd/system/ollama.service.d/override.conf <<'EOF'
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0"
+EOF
+systemctl daemon-reload
+systemctl restart ollama
+```
+
+**Allow Docker subnet through UFW** (Docker containers are on `172.17.0.0/16`):
+
+```bash
+ufw allow from 172.17.0.0/16 to any port 11434
+ufw enable   # if not already enabled
+```
+
+**Pull the required models:**
+
+```bash
+ollama pull nomic-embed-text   # ~274 MB — embedding model
+ollama pull llama3.2:3b        # ~2 GB — chat model (or llama3.1:8b for better quality)
+```
+
+### 4 — Install Coolify
+
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+
+Coolify runs on port `8000`. Open `http://<server-ip>:8000` in your browser, register, and complete the setup wizard.
+
+> **Port note:** Coolify itself occupies port 8000 and its Traefik proxy occupies port 8080. The `docker-compose.yml` does **not** expose any port for the FastAPI service — the web container reaches it via the internal Docker network (`http://api:8000`).
+
+### 5 — Connect your GitHub repository
+
+1. In Coolify: **Sources → GitHub App → Install** — authorize access to your Sage repo.
+2. Create a new **Resource → Docker Compose** service.
+3. Set the repository to your fork/clone of this repo.
+4. Set the branch to **`main`**.
+5. Set **Docker Compose Location** to `/docker-compose.yml` (note: `.yml`, not `.yaml`).
+
+### 6 — Set environment variables in Coolify
+
+In the Coolify service **Environment Variables** tab, add:
+
+| Variable | Value |
+|---|---|
+| `POSTGRES_USER` | `sage` |
+| `POSTGRES_PASSWORD` | (strong random password) |
+| `POSTGRES_DB` | `sage` |
+| `INTERNAL_SECRET` | (strong random value — at least 32 chars) |
+| `OLLAMA_BASE_URL` | `http://host.docker.internal:11434` |
+| `OLLAMA_CHAT_MODEL` | `llama3.2:3b` |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text` |
+| `CORS_ORIGINS` | `["http://<server-ip>:3000"]` or your domain |
+
+> **`INTERNAL_SECRET`**: Pydantic validates this in production and rejects the placeholder default `dev-secret-change-in-prod`. Generate a secure value: `openssl rand -hex 32`.
+
+### 7 — Deploy
+
+Click **Deploy** in Coolify. The first deploy takes 5-10 minutes (Docker image builds). Subsequent deploys are faster (layer caching).
+
+Open `http://<server-ip>:3000` once all containers are healthy.
+
+---
+
+## Production Debugging Guide
+
+A log of every deployment error encountered when first deploying to Hetzner + Coolify, and how each was fixed.
+
+### Docker Compose file not found at `/docker-compose.yaml`
+
+**Cause:** Coolify defaults to the `.yaml` extension but this repo uses `.yml`.
+
+**Fix:** In the Coolify service settings, change **Docker Compose Location** to `/docker-compose.yml`.
+
+---
+
+### Database container unhealthy — `init.sql` bind mount fails
+
+**Cause:** The original `docker-compose.yml` mounted `./infra/init.sql` into the db container. Coolify runs compose inside a build container where local paths don't exist.
+
+**Fix:** Remove the bind mount entirely. The `migrate-api` service already runs Alembic migration `001` which executes `CREATE EXTENSION IF NOT EXISTS vector`, so no manual SQL init is needed.
+
+---
+
+### Port `8000` already allocated
+
+**Cause:** Coolify itself runs on port 8000. The original `docker-compose.yml` tried to bind `8000:8000` for the FastAPI service.
+
+**Fix:** Remove all `ports:` from the `api` service. The `web` container reaches it via the internal Docker network on `http://api:8000`.
+
+---
+
+### Port `8080` already allocated
+
+**Cause:** Coolify's Traefik reverse proxy occupies port 8080.
+
+**Fix:** Same as above — no port bindings needed for the api service.
+
+---
+
+### `API_INTERNAL_SECRET` validation error at startup
+
+**Cause:** Pydantic rejects the default value `dev-secret-change-in-prod` when `ENVIRONMENT=production`.
+
+**Fix:** Set `INTERNAL_SECRET` to a strong random value (≥32 chars) in Coolify's Environment Variables tab.
+
+Generate one: `openssl rand -hex 32`
+
+---
+
+### API healthcheck timing out
+
+**Cause:** The HTTP-based healthcheck called the `/health` endpoint, which in turn pinged Ollama with a 5-second timeout — creating a race condition where Docker's healthcheck timeout fired before Ollama responded.
+
+**Fix:** Replace the HTTP healthcheck with a lightweight TCP port check:
+
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "python3 -c 'import socket; s=socket.create_connection((\"localhost\",8000),10); s.close()'"]
+  interval: 15s
+  timeout: 15s
+  retries: 5
+  start_period: 60s
+```
+
+---
+
+### `ctranslate2` model download fails at container startup (no internet in container)
+
+**Cause:** Using `uv run uvicorn ...` in the Docker CMD caused uv to attempt package management at startup, triggering a network download that fails because Coolify containers have no outbound internet access by default.
+
+**Fix:** Pre-install all packages at **build time** and invoke uvicorn directly:
+
+```dockerfile
+# Install deps at build time (not runtime)
+COPY pyproject.toml uv.lock ./
+RUN uv sync --no-dev --frozen
+
+COPY . .
+CMD ["/app/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+---
+
+### Ollama unreachable from Docker containers (`connection refused` / `connection timeout`)
+
+**Cause (1):** Ollama defaults to `127.0.0.1:11434`, which is only reachable from the host, not from Docker containers.
+
+**Fix:** Configure Ollama to listen on all interfaces via systemd override (see [Step 3](#3--install-ollama-natively-not-in-docker) above).
+
+**Cause (2):** UFW was blocking connections from Docker's subnet (`172.17.0.0/16`) to the host's port 11434.
+
+**Fix:**
+
+```bash
+ufw allow from 172.17.0.0/16 to any port 11434
+```
+
+**Verify connectivity from inside a running container:**
+
+```bash
+# Find any running container name/id
+docker ps
+
+# Test Ollama is reachable
+docker exec <container-name> python3 -c "
+import urllib.request
+r = urllib.request.urlopen('http://host.docker.internal:11434/api/tags', timeout=5)
+print(r.read()[:200])
+"
+```
+
+---
+
+### OCR taking 1+ hour (CPU thrashing on all pages in parallel)
+
+**Cause:** All PDF pages were submitted for OCR in parallel, pinning all CPU cores at 350%+ and causing severe throughput degradation due to context switching.
+
+**Fix:** Cap concurrent OCR workers with `asyncio.Semaphore(3)`:
+
+```python
+_sem = asyncio.Semaphore(3)
+
+async def _ocr_image(img, idx):
+    async with _sem:
+        text = await asyncio.to_thread(_run_ocr, img)
+    return ExtractedPage(text=text, page_number=idx)
+```
+
+Also replaced `pytesseract` (requires `tesseract-ocr` system package, slow) with `rapidocr-onnxruntime` (pure Python ONNX, 2-4x faster on CPU, no system deps).
+
+---
+
+### General debugging commands
+
+```bash
+# View all container statuses
+docker ps -a
+
+# Tail logs for a specific service
+docker logs sage-api-1 -f --tail=100
+
+# Check which ports are in use on the host
+ss -tlnp
+
+# Test a port from inside a container
+docker exec sage-web-1 python3 -c "
+import socket; s = socket.create_connection(('api', 8000), 5); print('OK'); s.close()
+"
+
+# Inspect container network / hosts file
+docker exec sage-api-1 cat /etc/hosts
+docker exec sage-api-1 ip route
+```
