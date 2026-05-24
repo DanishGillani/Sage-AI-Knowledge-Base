@@ -48,12 +48,17 @@ class PDFExtractor(BaseExtractor):
     async def _ocr_page(file_bytes: bytes, page_number: int) -> str:
         import asyncio
 
-        import pytesseract
+        import numpy as np
         from pdf2image import convert_from_bytes
+        from rapidocr_onnxruntime import RapidOCR
 
         def _run() -> str:
             images = convert_from_bytes(file_bytes, first_page=page_number, last_page=page_number)
-            return pytesseract.image_to_string(images[0]) if images else ""
+            if not images:
+                return ""
+            engine = RapidOCR()
+            result, _ = engine(np.array(images[0]))
+            return "\n".join(line[1] for line in result) if result else ""
 
         return await asyncio.to_thread(_run)
 
@@ -61,7 +66,6 @@ class PDFExtractor(BaseExtractor):
     async def _ocr_all_pages(file_bytes: bytes, filename: str) -> list[ExtractedPage]:
         import asyncio
 
-        import pytesseract
         from pdf2image import convert_from_bytes
 
         def _render() -> list[object]:
@@ -73,13 +77,21 @@ class PDFExtractor(BaseExtractor):
             msg = f"Could not render PDF pages for OCR (corrupted or password-protected): {exc}"
             raise RuntimeError(msg) from exc
 
+        import numpy as np
+        from rapidocr_onnxruntime import RapidOCR
+
         # Limit parallel OCR workers to avoid CPU thrashing on servers with few cores.
         # 3 concurrent pages keeps 3 cores busy while leaving 1 free for the rest of the app.
         _sem = asyncio.Semaphore(3)
+        _engine = RapidOCR()
+
+        def _run_ocr(img: object) -> str:
+            result, _ = _engine(np.array(img))
+            return "\n".join(line[1] for line in result) if result else ""
 
         async def _ocr_image(img: object, idx: int) -> ExtractedPage:
             async with _sem:
-                text = await asyncio.to_thread(pytesseract.image_to_string, img)
+                text = await asyncio.to_thread(_run_ocr, img)
             return ExtractedPage(text=text, page_number=idx)
 
         tasks = [_ocr_image(img, i) for i, img in enumerate(images, start=1)]

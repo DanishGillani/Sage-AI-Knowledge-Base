@@ -12,9 +12,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 \
     # faster-whisper (audio/video transcription)
     ffmpeg \
-    # pytesseract OCR fallback for locked/image-only PDFs
-    tesseract-ocr \
-    tesseract-ocr-eng \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv — fast Python package manager
