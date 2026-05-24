@@ -51,8 +51,6 @@ services:
       API_INTERNAL_SECRET: ${INTERNAL_SECRET:-dev-secret-change-in-prod}
       CORS_ORIGINS: '["http://localhost:3000"]'
       ENVIRONMENT: production
-    ports:
-      - "8080:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
