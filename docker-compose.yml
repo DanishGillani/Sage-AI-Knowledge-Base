@@ -52,7 +52,7 @@ services:
       CORS_ORIGINS: '["http://localhost:3000"]'
       ENVIRONMENT: production
     ports:
-      - "8000:8000"
+      - "8080:8000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
