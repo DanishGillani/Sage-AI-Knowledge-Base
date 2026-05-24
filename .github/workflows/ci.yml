@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Opt into Node.js 24 runner for all actions (removes Node.js 20 deprecation warnings)
 env:
@@ -124,6 +124,12 @@ jobs:
     name: E2E Tests (Playwright)
     runs-on: ubuntu-latest
     needs: [typecheck, lint]
+    env:
+      POSTGRES_USER: sage
+      POSTGRES_PASSWORD: sage
+      POSTGRES_DB: sage
+      INTERNAL_SECRET: ci-only-not-a-real-secret
+      DATABASE_URL: postgresql://sage:sage@localhost:5432/sage
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -143,13 +149,9 @@ jobs:
           timeout 60 bash -c 'until docker compose ps db | grep -q "healthy"; do sleep 2; done'
       - name: Build Next.js for E2E
         working-directory: apps/web
-        env:
-          DATABASE_URL: postgresql://sage:sage@localhost:5432/sage
         run: pnpm build
       - name: Run E2E tests (Chromium only in CI)
         working-directory: apps/web
-        env:
-          DATABASE_URL: postgresql://sage:sage@localhost:5432/sage
         run: pnpm exec playwright test --project=chromium
       - uses: actions/upload-artifact@v4
         if: always()
