@@ -73,8 +73,13 @@ class PDFExtractor(BaseExtractor):
             msg = f"Could not render PDF pages for OCR (corrupted or password-protected): {exc}"
             raise RuntimeError(msg) from exc
 
+        # Limit parallel OCR workers to avoid CPU thrashing on servers with few cores.
+        # 3 concurrent pages keeps 3 cores busy while leaving 1 free for the rest of the app.
+        _sem = asyncio.Semaphore(3)
+
         async def _ocr_image(img: object, idx: int) -> ExtractedPage:
-            text = await asyncio.to_thread(pytesseract.image_to_string, img)
+            async with _sem:
+                text = await asyncio.to_thread(pytesseract.image_to_string, img)
             return ExtractedPage(text=text, page_number=idx)
 
         tasks = [_ocr_image(img, i) for i, img in enumerate(images, start=1)]
