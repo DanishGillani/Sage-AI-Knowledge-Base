@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
 # Opt into Node.js 24 runner for all actions (removes Node.js 20 deprecation warnings)
 env:
@@ -137,6 +137,11 @@ jobs:
         working-directory: apps/web
         run: pnpm exec playwright install --with-deps chromium
       - name: Start infrastructure
+        env:
+          POSTGRES_USER: sage
+          POSTGRES_PASSWORD: sage
+          POSTGRES_DB: sage
+          INTERNAL_SECRET: ci-only-not-a-real-secret
         run: docker compose up -d db
       - name: Wait for database
         run: |
